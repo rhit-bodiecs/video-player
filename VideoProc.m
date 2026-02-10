@@ -1,5 +1,5 @@
 clear
-vid = VideoReader('Videos/counterstrike2.mp4');
+vid = VideoReader('Videos/boat.mp4');
 frame = 0;
 while hasFrame(vid)
     I = readFrame(vid);

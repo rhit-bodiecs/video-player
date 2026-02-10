@@ -4,7 +4,7 @@
 .org userMem - 2
 .db t2ByteTok, tAsmCmp
 
-Start:
+
     BCALL(_RunIndicOff)      ; Turn off run indicator
     BCALL(_ClrLCDFull)       ; Clear the LCD completely
     ; Clear screen
@@ -13,32 +13,33 @@ Start:
     LD     DE, PlotSScreen + 1
     LD     BC, 767
     LDIR
-    
+Start:
     LD     HL, videoName
     rst    20h
     ;CALL   FindData
 
     CALL   FindData         ; A = page, HL = offset, DE = size
+    JP      C, errorNotFound
     
     ; DEBUG: Display the values
-    PUSH   AF
-    PUSH   HL
-    PUSH   DE
+    ;PUSH   AF
+    ;PUSH   HL
+    ;PUSH   DE
     
     ; Show offset returned by FindData
-    EX     DE, HL
-    LD     H, 2
-    LD     L, 0
-    LD     (CurRow), HL
-    LD     H, A
-    BCALL(_DispHL)
+    ;EX     DE, HL
+    ;LD     H, 2
+    ;LD     L, 0
+    ;LD     (CurRow), HL
+    ;LD     H, A
+    ;BCALL(_DispHL)
     
     ; Wait for keypress
-    BCALL(_GetKey)
+    ;BCALL(_GetKey)
     
-    POP    DE
-    POP    HL
-    POP    AF
+    ;POP    DE
+    ;POP    HL
+    ;POP    AF
     
     
     ; Initialize state 
@@ -263,7 +264,8 @@ ResetState:
 
 FindData:
     BCALL(_ChkFindSym)
-    jr     c, errorNotFound
+    ;jr     c, errorNotFound
+    ret    c
     ld     a, b
     or     a
     jr     z, itemIsInRAM
@@ -292,14 +294,8 @@ FindData:
     inc    a
     ret
 
-errorNotFound:
-    RET
-    
-itemIsInRAM:
-    RET
-
 videoName:
-    .DB    15h, "VIDEO", 0, 0, 0
+    .DB    15h, "VIDEO0", 0, 0
 
 ; State variables (in RAM, after program code)
 PageCrossed:    .DB 0
@@ -315,5 +311,13 @@ Remain:      .DB 0     ; remaining bytes in current run/literal
 CurByte:     .DB 0     ; literal/run byte value
 
 EndVid:
+    LD     HL, videoName + 6
+    LD     A, (HL)
+    INC    A
+    LD     (HL), A
+    JP     Start
+itemIsInRAM:
+    RET
+errorNotFound:
     RET
 .end

@@ -11,6 +11,9 @@ import java.util.Scanner;
 
 
 public class Compress {
+    public static final String HEADERNAME = "VIDEO";
+    public static final String VIDEONAME = "boat";
+    public static final int CHUNKSIZE = 40000;
 
     private static int getByte(int[] arr, int idx){
         int out = 0;
@@ -80,6 +83,50 @@ public class Compress {
         return output;
     }
 
+    private static void makeFile(byte[] compressedVideo, int dataSize, String headerName, String fileName){
+        // Calculate total file size
+        int totalSize = 55 + 17 + 2 + dataSize + 2; // header + entry meta + entry data length + data + checksum
+
+        ByteBuffer buf = ByteBuffer.allocate(totalSize);
+        buf.order(ByteOrder.LITTLE_ENDIAN);
+
+        // --- Outer header (55 bytes) ---
+        buf.put("**TI83F*".getBytes(StandardCharsets.US_ASCII));   // signature
+        buf.put(new byte[]{0x1A, 0x0A, 0x00});                     // further signature
+        byte[] comment = "comment".getBytes(StandardCharsets.US_ASCII);
+        buf.put(comment);
+        buf.put(new byte[42 - comment.length]);                    // null pad comment to 42 bytes
+        buf.putShort((short)(17 + 2 + dataSize));                  // data section length (excludes checksum)
+
+        // --- Variable entry (17 bytes) ---
+        buf.putShort((short)0x000D);                               // storage flag
+        buf.putShort((short)(dataSize + 2));                             // variable data length
+        buf.put((byte)0x15);                                       // type ID: AppVar
+        buf.put(headerName.getBytes(StandardCharsets.US_ASCII));      // name
+        buf.put(new byte[8 - headerName.length()]);                                      // null pad name to 8 bytes
+        buf.put((byte)0x00);                                       // version
+        buf.put((byte)0x80);                                       // archive flag
+        buf.putShort((short)(dataSize + 2));                             // variable data length (duplicate)
+
+        // --- Entry data ---
+        buf.putShort((short)dataSize);                             // length prefix (third copy)
+        buf.put(compressedVideo);                                  // your actual data
+
+        // --- Checksum ---
+        int checksum = 0;
+        for (int i = 55; i < buf.position(); i++) {
+            checksum += (buf.get(i) & 0xFF);
+        }
+        buf.putShort((short)(checksum & 0xFFFF));
+
+        // --- Write to file ---
+        try (FileOutputStream fos = new FileOutputStream(fileName)) {
+            fos.write(buf.array());
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
     public static void main(String[] args) {
         int[] pixels = new int[6144];
         ArrayList<ArrayList<Integer>> videoData = new ArrayList<>();
@@ -105,60 +152,61 @@ public class Compress {
         System.out.println(videoData.size());
         dumpAsmDB(videoData.get(0));
 
+        // int sizeBytes = 0;
+        // for(ArrayList<Integer> frame : videoData){
+        //     sizeBytes += frame.size();
+        // }
+
+        // byte[] compressedVideo = new byte[sizeBytes];
+        // int pos = 0;
+        // for(ArrayList<Integer> frame : videoData){
+        //     for(int b : frame){
+        //         compressedVideo[pos++] = (byte)(b & 0xFF);
+        //     }
+        // }
+        
         int sizeBytes = 0;
-        for(ArrayList<Integer> frame : videoData){
+        int chunkStart = 0;
+        int chunkNumber = 0;
+
+        for(int frameNum = 0; frameNum < videoData.size(); frameNum++){
+            ArrayList<Integer> frame = videoData.get(frameNum);
+            
+            if(sizeBytes + frame.size() > CHUNKSIZE && sizeBytes > 0){
+                // Write current chunk (from chunkStart to frameNum-1)
+                byte[] compressedVideo = new byte[sizeBytes];
+                int pos = 0;
+                for(int i = chunkStart; i < frameNum; i++){
+                    for(int j = 0; j < videoData.get(i).size(); j++){
+                        compressedVideo[pos++] = (byte)(videoData.get(i).get(j) & 0xFF);
+                    }
+                }
+                makeFile(compressedVideo, sizeBytes, 
+                        HEADERNAME + chunkNumber, 
+                        VIDEONAME + chunkNumber + ".8xv");
+                
+                chunkNumber++;
+                chunkStart = frameNum;
+                sizeBytes = 0;
+            }
+            
             sizeBytes += frame.size();
         }
 
-        byte[] compressedVideo = new byte[sizeBytes];
-        int pos = 0;
-        for(ArrayList<Integer> frame : videoData){
-            for(int b : frame){
-                compressedVideo[pos++] = (byte)(b & 0xFF);
+        // Write final chunk
+        if(sizeBytes > 0){
+            byte[] compressedVideo = new byte[sizeBytes];
+            int pos = 0;
+            for(int i = chunkStart; i < videoData.size(); i++){
+                for(int j = 0; j < videoData.get(i).size(); j++){
+                    compressedVideo[pos++] = (byte)(videoData.get(i).get(j) & 0xFF);
+                }
             }
+            makeFile(compressedVideo, sizeBytes, 
+                    HEADERNAME + chunkNumber, 
+                    VIDEONAME + chunkNumber + ".8xv");
         }
-        // Calculate total file size
-        int dataSize = sizeBytes;
-        int totalSize = 55 + 17 + 2 + dataSize + 2; // header + entry meta + entry data length + data + checksum
-
-        ByteBuffer buf = ByteBuffer.allocate(totalSize);
-        buf.order(ByteOrder.LITTLE_ENDIAN);
-
-        // --- Outer header (55 bytes) ---
-        buf.put("**TI83F*".getBytes(StandardCharsets.US_ASCII));   // signature
-        buf.put(new byte[]{0x1A, 0x0A, 0x00});                     // further signature
-        byte[] comment = "comment".getBytes(StandardCharsets.US_ASCII);
-        buf.put(comment);
-        buf.put(new byte[42 - comment.length]);                    // null pad comment to 42 bytes
-        buf.putShort((short)(17 + 2 + dataSize));                  // data section length (excludes checksum)
-
-        // --- Variable entry (17 bytes) ---
-        buf.putShort((short)0x000D);                               // storage flag
-        buf.putShort((short)(dataSize + 2));                             // variable data length
-        buf.put((byte)0x15);                                       // type ID: AppVar
-        buf.put("VIDEO".getBytes(StandardCharsets.US_ASCII));      // name
-        buf.put(new byte[3]);                                      // null pad name to 8 bytes
-        buf.put((byte)0x00);                                       // version
-        buf.put((byte)0x80);                                       // archive flag
-        buf.putShort((short)(dataSize + 2));                             // variable data length (duplicate)
-
-        // --- Entry data ---
-        buf.putShort((short)dataSize);                             // length prefix (third copy)
-        buf.put(compressedVideo);                                  // your actual data
-
-        // --- Checksum ---
-        int checksum = 0;
-        for (int i = 55; i < buf.position(); i++) {
-            checksum += (buf.get(i) & 0xFF);
-        }
-        buf.putShort((short)(checksum & 0xFFFF));
-
-        // --- Write to file ---
-        try (FileOutputStream fos = new FileOutputStream("counterstrike2.8xv")) {
-            fos.write(buf.array());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        
         
 
         // ArrayList<Integer> output = new ArrayList<>();
