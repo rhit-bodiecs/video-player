@@ -12,8 +12,8 @@ import java.util.Scanner;
 
 public class Compress {
     public static final String HEADERNAME = "VIDEO";
-    public static final String VIDEONAME = "boat";
-    public static final int CHUNKSIZE = 40000;
+    public static String VIDEONAME = "VIDEO";
+    public static int CHUNKSIZE = 30000;
 
     private static int getByte(int[] arr, int idx){
         int out = 0;
@@ -128,6 +128,12 @@ public class Compress {
     }
 
     public static void main(String[] args) {
+	if(args.length >= 1){
+		VIDEONAME = args[0];
+	}
+	if(args.length >= 2){
+		CHUNKSIZE = Integer.parseInt(args[1]);
+	}
         int[] pixels = new int[6144];
         ArrayList<ArrayList<Integer>> videoData = new ArrayList<>();
         //int[] pixels = new int[72];
@@ -148,9 +154,9 @@ public class Compress {
             System.out.println("An error occurred: The file was not found.");
             e.printStackTrace();
         }
-        System.out.println(videoData.get(0).size());
-        System.out.println(videoData.size());
-        dumpAsmDB(videoData.get(0));
+        //System.out.println(videoData.get(0).size());
+        //System.out.println(videoData.size());
+        //dumpAsmDB(videoData.get(0));
 
         // int sizeBytes = 0;
         // for(ArrayList<Integer> frame : videoData){
@@ -164,10 +170,13 @@ public class Compress {
         //         compressedVideo[pos++] = (byte)(b & 0xFF);
         //     }
         // }
+        for(ArrayList<Integer> frame : videoData){
+            if(frame.size() > 768) System.out.println(frame.size());
+        }
         
         int sizeBytes = 0;
         int chunkStart = 0;
-        int chunkNumber = 0;
+        char chunkNumber = 'a';
 
         for(int frameNum = 0; frameNum < videoData.size(); frameNum++){
             ArrayList<Integer> frame = videoData.get(frameNum);

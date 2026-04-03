@@ -127,6 +127,12 @@ LoadDone:
     LD     (BuffPtr), HL
     
 DecompLoop:
+    ; handle case where individual frame > 768 bytes
+    LD     HL, (BuffPtr)
+    LD     DE, 768
+    OR     A
+    SBC    HL, DE
+    JP     NC, BufferExhausted
     ; Finished frame?
     LD HL, (ScreenPtr)
     LD DE, 768
@@ -221,7 +227,13 @@ UseRunByte:
     JP DecompLoop           ;back to decomp loop
 NewFrame:
     BCALL(_GrBufCpy)
-
+    XOR    A
+    LD     H, A
+    LD     L, A
+    LD     (ScreenPtr), HL
+    LD     (Mode), A
+    LD     (Remain), A
+BufferExhausted:
     ; Update DataConsumed
     LD     HL, (BuffPtr)
     LD     DE, (DataConsumed)
@@ -253,10 +265,10 @@ ResetState:
     XOR    A
     LD     H, A
     LD     L, A
-    LD     (ScreenPtr), HL
+    ;LD     (ScreenPtr), HL
     LD     (BuffPtr), HL
-    LD     (Mode), A
-    LD     (Remain), A
+    ;LD     (Mode), A
+    ;LD     (Remain), A
     LD     (CurByte), A
 
     JP     FrameLoop
@@ -295,7 +307,7 @@ FindData:
     ret
 
 videoName:
-    .DB    15h, "VIDEO0", 0, 0
+    .DB    15h, "VIDEOa", 0, 0
 
 ; State variables (in RAM, after program code)
 PageCrossed:    .DB 0

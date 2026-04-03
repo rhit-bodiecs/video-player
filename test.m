@@ -1,0 +1,1 @@
+video2calc("Videos/avabike/avabike.mov", "-o", "avabike", "-c", "64000", "-fps", "15");
