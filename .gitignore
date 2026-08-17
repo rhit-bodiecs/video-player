@@ -1,0 +1,2 @@
+# Ignore source videos (including files in nested folders).
+/Videos/**/*.[mM][pP]4
